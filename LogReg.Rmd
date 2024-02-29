@@ -1,0 +1,109 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(e1071)
+library(ROCR)
+```
+
+```{r}
+parole <- read_csv("parole.csv")
+summary(parole)
+str(parole)
+```
+
+```{r}
+parole = parole %>%
+  mutate(male = as.factor(male)) %>%
+  mutate(male = fct_recode(male, "Female" = "0", "Male" = "1")) %>%
+  mutate(race = as.factor(race)) %>%
+  mutate(race = fct_recode(race, "Other Race" = "2", "White" = "1")) %>%
+  mutate(state = as.factor(state)) %>%
+  mutate(state = fct_recode(state, "Other State" = "1", "KY" = "2", "LA" = "3", "VA" = "4")) %>%
+  mutate(crime = as.factor(crime)) %>%
+  mutate(crime = fct_recode(crime, "Larceny" = "2", "Drug" = "3","Driving" = "4","Other Crime" = "1")) %>%
+  mutate(multiple.offenses = as.factor(multiple.offenses)) %>%
+  mutate(multiple.offenses = fct_recode(multiple.offenses, "No" = "0", "Yes" = "1")) %>%
+  mutate(violator = as.factor(violator)) %>%
+  mutate(violator = fct_recode(violator, "No" = "0", "Yes" = "1"))
+
+str(parole)
+```
+
+```{r}
+summary(parole$violator)
+```
+
+```{r}
+set.seed(12345)
+parole_split = initial_split(parole, prop = 0.70, strata = violator)
+
+train = training(parole_split)
+test = testing(parole_split)
+nrow(train)
+```
+
+```{r}
+levels(train$violator)
+```
+
+```{r}
+train = train %>% mutate(violator = fct_relevel(violator, c("No","Yes")))
+levels(train$violator)
+```
+
+```{r}
+ggplot(parole, aes(x=parole$state, fill = violator)) + geom_bar() + theme_bw()
+```
+
+```{r}
+ggplot(parole, aes(x=parole$max.sentence, fill = violator)) + geom_bar(position = "fill") + theme_bw()
+```
+
+```{r}
+parole_model = 
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe = 
+  recipe(violator ~ state, parole)%>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf = 
+  workflow() %>%
+  add_recipe(parole_recipe) %>%
+  add_model(parole_model)
+
+parole_fit = fit(logreg_wf, parole)
+  
+```
+
+```{r}
+summary(parole_fit$fit$fit$fit)
+```
+
+```{r}
+parole_model2 = 
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe2 = 
+  recipe(violator ~ state + multiple.offenses + race, train)%>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf2 = 
+  workflow() %>%
+  add_recipe(parole_recipe2) %>%
+  add_model(parole_model2)
+
+parole_fit2 = fit(logreg_wf2, train)
+```
+
+```{r}
+summary(parole_fit2$fit$fit$fit)
+```
+
+```{r}
+newdata = data.frame(state = "LA", multiple.offenses = "Yes", race = "White")
+predict(parole_fit2, newdata, type = "prob")
+```
+

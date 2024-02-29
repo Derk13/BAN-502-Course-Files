@@ -1,0 +1,100 @@
+```{r}
+options(tidyverse.quiet=TRUE)
+library(tidyverse)
+library(tidymodels)
+library(cluster) #algorithms for clustering
+library(factoextra) #visualization
+library(dendextend) #viewing clustering dendograms
+```
+
+```{r}
+trucks = read_csv("trucks-1.csv")
+str(trucks)
+summary(trucks)
+```
+
+```{r}
+ggplot(trucks,aes(y=Distance,x=Speeding)) +
+  geom_point()
+```
+
+```{r}
+trucks = trucks %>% select(-Driver_ID)
+trucks_cleaned = scale(trucks)
+summary(trucks_cleaned)
+```
+
+```{r}
+set.seed(64)
+kclust = kmeans(trucks_cleaned, centers = 2) #run k-means clustering with k = 3
+kclust #view results
+```
+
+```{r}
+trucks = augment(kclust, trucks)
+trucks
+```
+
+```{r}
+ggplot(trucks, aes(x=Speeding, y=Distance, color = .cluster)) +
+  geom_point(alpha = 0.4) + theme_bw()
+```
+
+```{r}
+set.seed(412)
+clusts = 
+  tibble(k = 1:8) %>%
+  mutate(
+    kclust = map(k, ~kmeans(trucks_cleaned, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, trucks_cleaned)
+  )
+
+clusts
+```
+
+```{r}
+clusters = 
+  clusts %>%
+  unnest(cols = c(tidied))
+
+assignments = 
+  clusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings = 
+  clusts %>%
+  unnest(cols = c(glanced))
+```
+
+```{r}
+p1 = 
+  ggplot(assignments, aes(x = Speeding, y = Distance)) +
+  geom_point(aes(color = .cluster), alpha = 0.8) + 
+  facet_wrap(~ k)
+p1
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+```
+
+```{r}
+set.seed(64)
+kclust = kmeans(trucks_cleaned, centers = 4) #run k-means clustering with k = 4
+kclust #view results
+```
+
+```{r}
+trucks = augment(kclust, trucks)
+trucks
+```
+
+```{r}
+ggplot(trucks, aes(x=Speeding, y=Distance, color = .cluster)) +
+  geom_point(alpha = 0.4) + theme_bw()
+```
+
